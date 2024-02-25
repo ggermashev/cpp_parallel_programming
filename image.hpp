@@ -16,6 +16,7 @@ class Image
     public:
         Image(string fileName)
         {
+            this->fileName = fileName;
             this->writeRootPath();
             this->parseImage(fileName);
             this->rawPixelsToRgb();
@@ -23,6 +24,10 @@ class Image
 
         vector<Pixel*> getPixels() {
             return this->pixels;
+        }
+
+        string getFileName() {
+            return this->fileName;
         }
 
         bool hasPixels() {
@@ -42,6 +47,7 @@ class Image
         }
 
     private:
+        string fileName; 
         string ROOT_PATH {""};
         unsigned char* img;
         int width, height, channels;

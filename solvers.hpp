@@ -1,7 +1,10 @@
 #include <chrono>
 #include <ctime> 
+#include <thread>
+#include <omp.h>
 #include "image.hpp"
 
+using namespace std;
 #define THREADS_NUMBER 8
 
 class Args {
@@ -27,6 +30,7 @@ class BaseCounter {
         BaseCounter(Image* img) {
             this->img = img;
             this->pixels = this->img->getPixels();
+            this->imgFileName = img->getFileName();
         }
 
         void print()
@@ -48,10 +52,25 @@ class BaseCounter {
             this->calcTimeDecorator();
         };
 
+        void count(bool withDecorator) {
+            if (!this->img->hasPixels()) {
+                cout << "Ошибка при загрузке изображения\n";
+                return;
+            }
+
+            if (withDecorator) {
+                this->calcTimeDecorator();
+            } else {
+                this->countWrap()
+            }
+            
+        };
+
     protected:
         int rgb[3] {0, 0, 0};
         Image* img;
         vector<Pixel *> pixels;
+        string imgFileName;
 
         void calcTimeDecorator() {
             auto start = std::chrono::system_clock::now();
@@ -62,6 +81,25 @@ class BaseCounter {
         }
 
         virtual void countWrap() {};
+
+        static DWORD __stdcall countParallel(void *args) {
+            Args* params = (Args*)args;
+
+            int dw = params->width / THREADS_NUMBER;
+            if (params->t_num == THREADS_NUMBER - 1) {
+                dw = params->width - (THREADS_NUMBER - 1)*dw;
+            }
+
+            int endw = params->width - (params->width / THREADS_NUMBER) * params->t_num;
+
+            for (int i = endw - 1; i >= endw - dw; i--) {
+                for (int j = 0; j < params->height; j++) {
+                    params->rgb[params->pixels[params->width*j + i]->getDominantColor()]++;
+                }
+            }
+
+            return 0;
+        }
 };
 
 
@@ -87,25 +125,6 @@ class CreateThreadWithHeapCreateCounter: public BaseCounter {
         CreateThreadWithHeapCreateCounter(Image* img) : BaseCounter(img) {};
 
     private:
-        static DWORD __stdcall countParallel(void *args) {
-            Args* params = (Args*)args;
-
-            int dw = params->width / THREADS_NUMBER;
-            if (params->t_num == THREADS_NUMBER - 1) {
-                dw = params->width - (THREADS_NUMBER - 1)*dw;
-            }
-
-            int endw = params->width - (params->width / THREADS_NUMBER) * params->t_num;
-
-            for (int i = endw - 1; i >= endw - dw; i--) {
-                for (int j = 0; j < params->height; j++) {
-                    params->rgb[params->pixels[params->width*j + i]->getDominantColor()]++;
-                }
-            }
-
-            return 0;
-        }
-
         void countWrap() {
             DWORD th_id[THREADS_NUMBER];
             HANDLE th_h[THREADS_NUMBER];
@@ -118,7 +137,7 @@ class CreateThreadWithHeapCreateCounter: public BaseCounter {
                 rgbs[i] = (int*) HeapAlloc(heap[i], HEAP_ZERO_MEMORY, sizeof(int)*3);
                 Args* args = new Args(this->pixels, this->img->getWidth(), this->img->getHeight(), i, rgbs[i]);
 
-                th_h[i] = CreateThread(NULL, 0, CreateThreadWithHeapCreateCounter::countParallel, args, 0, th_id+i);
+                th_h[i] = CreateThread(NULL, 0, BaseCounter::countParallel, args, 0, th_id+i);
             }
 
             WaitForMultipleObjects(THREADS_NUMBER, th_h, true, INFINITE);
@@ -135,3 +154,114 @@ class CreateThreadWithHeapCreateCounter: public BaseCounter {
             return;
         }
 };
+
+
+class ThreadCounter: public BaseCounter {
+    public:
+        ThreadCounter(Image* img): BaseCounter(img) {};
+
+    private:
+        void countWrap() {
+            thread* ths[THREADS_NUMBER];
+
+            HANDLE heap = HeapCreate(0, 0, 0);;
+            int* rgbs[THREADS_NUMBER];
+
+            for (int i = 0; i < THREADS_NUMBER; i++) {
+                rgbs[i] = (int*) HeapAlloc(heap, HEAP_ZERO_MEMORY, sizeof(int)*3);
+                Args* args = new Args(this->pixels, this->img->getWidth(), this->img->getHeight(), i, rgbs[i]);
+
+                ths[i] = new thread(BaseCounter::countParallel, args);
+            }
+
+            for (int i = 0; i < THREADS_NUMBER; i++) {
+                ths[i]->join();
+            }
+
+            for (auto rgb: rgbs) {
+                for (int i = 0; i < 3; i++) {
+                    this->rgb[i] += rgb[i];
+                }
+            }
+
+            cout << "std::thread RGB:\n";
+            this->print();
+
+            return;
+
+        }
+};
+
+
+class OMPCounter: public BaseCounter {
+    public:
+        OMPCounter(Image* img): BaseCounter(img) {};
+
+    private:
+        void countWrap() {
+            omp_set_num_threads(THREADS_NUMBER);
+            
+            HANDLE heap = HeapCreate(0, 0, 0);;
+            int* rgbs[THREADS_NUMBER];
+            int i = 0;
+
+            #pragma omp parallel default(none) shared(rgbs, i, heap)
+            {
+                #pragma omp for
+                for (i = 0; i < THREADS_NUMBER; i++) {
+                    rgbs[i] = (int*) HeapAlloc(heap, HEAP_ZERO_MEMORY, sizeof(int)*3);
+                    Args* args = new Args(this->pixels, this->img->getWidth(), this->img->getHeight(), i, rgbs[i]);
+
+                    BaseCounter::countParallel(args);
+                }
+            }
+
+            #pragma omp barrier
+
+            for (auto rgb: rgbs) {
+                for (int i = 0; i < 3; i++) {
+                    this->rgb[i] += rgb[i];
+                }
+            }
+
+            cout << "OMP RGB:\n";
+            this->print();
+
+            return;
+        }
+};
+
+
+class CreateProcessCounter: public BaseCounter {
+    public:
+        CreateProcessCounter(Image* img, int argc, char** argv): BaseCounter(img) {
+            this->argc = argc;
+            this->argv = argv;
+        };
+
+    private:
+        int argc;
+        char** argv; 
+
+        void countWrap() {
+            char cmd[4096];
+
+            if (this->argc < 3) {
+                for (int i = 0; i < THREADS_NUMBER; i++) {
+                    STARTUPINFO si;
+                    PROCESS_INFORMATION pi;
+
+                    ZeroMemory(&si, sizeof(si));
+                    si.cb = sizeof(si);
+                    ZeroMemory(&pi, sizeof(pi));
+                    
+                    sprintf(cmd, "\"%s\" \"%s\" %d", this->argv0, this->imgFileName, i);
+                    CreateProcessA(NULL, cmd, NULL, NULL, true, 0, NULL, NULL, &si, &pi);
+
+                    
+                }
+            } else {
+
+            }
+        }
+}
