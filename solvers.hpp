@@ -239,26 +239,32 @@ class CreateProcessCounter: public BaseCounter {
             this->argv = argv;
         };
 
+        CreateProcessCounter(int argc, char** argv): BaseCounter() {
+            this->argc = argc;
+            this->argv = argv;
+        };
+
     private:
         int argc;
         char** argv; 
 
         void countWrap() {
-            char cmd[4096];
-
             if (this->argc < 3) {
-                for (int i = 0; i < THREADS_NUMBER; i++) {
-                    STARTUPINFO si;
-                    PROCESS_INFORMATION pi;
+                char cmd[4096];
+                STARTUPINFO si[THREADS_NUMBER];
+                PROCESS_INFORMATION pi[THREADS_NUMBER];
 
-                    ZeroMemory(&si, sizeof(si));
+                for (int i = 0; i < THREADS_NUMBER; i++) {
+                    ZeroMemory(&si[i], sizeof(si[i]));
                     si.cb = sizeof(si);
-                    ZeroMemory(&pi, sizeof(pi));
+                    ZeroMemory(&pi[i], sizeof(pi[i]));
                     
                     sprintf(cmd, "\"%s\" \"%s\" %d", this->argv0, this->imgFileName, i);
-                    CreateProcessA(NULL, cmd, NULL, NULL, true, 0, NULL, NULL, &si, &pi);
+                    CreateProcessA(NULL, cmd, NULL, NULL, true, 0, NULL, NULL, &si[i], &pi[i]);
+                }
 
-                    
+                for (int i = 0; i < THREADS_NUMBER; i++) {
+                    WaitForSingleObject(pi[i].hProcess, INFINITE);
                 }
             } else {
 

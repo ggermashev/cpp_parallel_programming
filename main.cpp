@@ -31,9 +31,6 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    string path = argv[1];
-    Image *img = new Image(path);
-
     CreateProcessCounter* createProcessCounter = new CreateProcessCounter(img, argc, argv);
     createProcessCounter->count(false);
 
