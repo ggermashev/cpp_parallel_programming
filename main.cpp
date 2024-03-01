@@ -9,30 +9,28 @@
 
 int main(int argc, char** argv)
 {
-    if (argc < 3) {
-        string path = "assets/monkey.jpg";
-        
-        if (argc == 2) {
-            path = argv[1];
-        }
 
-        Image *img = new Image(path);
-
-        ThreadCounter* threadCounter = new ThreadCounter(img);
-        threadCounter->count();
-
-        OMPCounter* ompCounter = new OMPCounter(img);
-        ompCounter->count();
-
-        CreateProcessCounter* createProcessCounter = new CreateProcessCounter(img, argc, argv);
-        createProcessCounter->count();
-
-        img->clear();
-        return 0;
+    string path = "assets/monkey.jpg";
+    
+    if (argc == 2) {
+        path = argv[1];
     }
 
-    CreateProcessCounter* createProcessCounter = new CreateProcessCounter(img, argc, argv);
-    createProcessCounter->count(false);
+    Image *img = new Image(path);
 
+    ThreadCounter* threadCounter = new ThreadCounter(img);
+    threadCounter->count();
+
+    PThreadCounter* pThreadCounter = new PThreadCounter(img);
+    pThreadCounter->count();
+
+    OMPCounter* ompCounter = new OMPCounter(img);
+    ompCounter->count();
+
+    // CreateProcessCounter* createProcessCounter = new CreateProcessCounter(img, argc, argv);
+    // createProcessCounter->count();
+
+    // img->clear();
     return 0;
+
 }

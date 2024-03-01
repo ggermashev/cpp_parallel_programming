@@ -55,7 +55,7 @@ class Image
 
         void writeRootPath()
         {
-            char path[256];
+            char path[256] {};
             size_t len = sizeof(path);
 
             int bytes = GetModuleFileName(NULL, path, len);
@@ -72,6 +72,7 @@ class Image
                     slashes.push_back(i);
                 }
             }
+    
 
             int delimiter = slashes.at(slashes.size() - 1);
             for (int i = 0; i <= delimiter; i++)
