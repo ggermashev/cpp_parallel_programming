@@ -5,6 +5,9 @@
 0. brute count
 1. CreateThread
 2. Доп. задание 1b. HeapCreate / HeapAlloc
+3. 2. pthread_create
+4. 3. dts::thread
+5. 4. OMP
 
 ## Описание файлов
 

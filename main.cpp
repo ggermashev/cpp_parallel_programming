@@ -9,8 +9,7 @@
 
 int main(int argc, char** argv)
 {
-
-    string path = "assets/monkey.jpg";
+    string path = "path/to/img";
     
     if (argc == 2) {
         path = argv[1];
@@ -30,7 +29,6 @@ int main(int argc, char** argv)
     // CreateProcessCounter* createProcessCounter = new CreateProcessCounter(img, argc, argv);
     // createProcessCounter->count();
 
-    // img->clear();
+    img->clear();
     return 0;
-
 }
