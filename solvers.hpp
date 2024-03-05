@@ -3,6 +3,7 @@
 #include <thread>
 #include <pthread.h>
 #include <omp.h>
+#include <filesystem>
 #include "image.hpp"
 
 using namespace std;
@@ -54,13 +55,8 @@ class BaseCounter {
         };
 
         void count(bool withDecorator) {
-            if (!this->img->hasPixels()) {
-                cout << "Ошибка при загрузке изображения\n";
-                return;
-            }
-
             if (withDecorator) {
-                this->calcTimeDecorator();
+                this->count();
             } else {
                 this->countWrap();
             }
@@ -294,42 +290,86 @@ class OMPCounter: public BaseCounter {
 };
 
 
-// class CreateProcessCounter: public BaseCounter {
-//     public:
-//         CreateProcessCounter(Image* img, int argc, char** argv): BaseCounter(img) {
-//             this->argc = argc;
-//             this->argv = argv;
-//         };
+class CreateProcessCounter: public BaseCounter {
+    public:
+        CreateProcessCounter(Image* img, int argc, char** argv): BaseCounter(img) {
+            this->argc = argc;
+            this->argv = argv;
+        };
 
-//         CreateProcessCounter(int argc, char** argv): BaseCounter() {
-//             this->argc = argc;
-//             this->argv = argv;
-//         };
+    private:
+        int argc;
+        char** argv; 
 
-//     private:
-//         int argc;
-//         char** argv; 
+        void countWrap() {
+            if (this->argc < 3) {
+                char cmd[4096];
+                STARTUPINFO si[THREADS_NUMBER];
+                PROCESS_INFORMATION pi[THREADS_NUMBER];
 
-//         void countWrap() {
-//             if (this->argc < 3) {
-//                 char cmd[4096];
-//                 STARTUPINFO si[THREADS_NUMBER];
-//                 PROCESS_INFORMATION pi[THREADS_NUMBER];
-
-//                 for (int i = 0; i < THREADS_NUMBER; i++) {
-//                     ZeroMemory(&si[i], sizeof(si[i]));
-//                     si.cb = sizeof(si);
-//                     ZeroMemory(&pi[i], sizeof(pi[i]));
+                for (int i = 0; i < THREADS_NUMBER; i++) {
+                    ZeroMemory(&si[i], sizeof(si[i]));
+                    si[i].cb = sizeof(si[i]);
+                    ZeroMemory(&pi[i], sizeof(pi[i]));
                     
-//                     sprintf(cmd, "\"%s\" \"%s\" %d", this->argv0, this->imgFileName, i);
-//                     CreateProcessA(NULL, cmd, NULL, NULL, true, 0, NULL, NULL, &si[i], &pi[i]);
-//                 }
+                    sprintf(cmd, "\"%s\" \"%s\" %d", this->argv[0], this->imgFileName.c_str(), i);
+                    CreateProcessA(NULL, cmd, NULL, NULL, true, 0, NULL, NULL, &si[i], &pi[i]);
+                }
 
-//                 for (int i = 0; i < THREADS_NUMBER; i++) {
-//                     WaitForSingleObject(pi[i].hProcess, INFINITE);
-//                 }
-//             } else {
+                for (int i = 0; i < THREADS_NUMBER; i++) {
+                    WaitForSingleObject(pi[i].hProcess, INFINITE);
+                }
 
-//             }
-//         }
-// };
+
+                for (int i = 0; i < THREADS_NUMBER; i++) {
+                    int rgbs[3] {0, 0, 0};
+                    string name = to_string(i).append(".txt");
+
+                    FILE *f = fopen(TEXT(name.c_str()), "rb");
+                    fread(rgbs, sizeof(int), 3, f);
+
+                    for (int i = 0; i < 3; i++) {
+                        this->rgb[i] += rgbs[i];
+                    }
+
+                    fclose(f);
+                    filesystem::remove(name.c_str());
+                }    
+
+                cout << "CreateProcess:\n";
+                this->print();
+
+
+            } else {
+                int rgbs[3] {0,0,0};
+                int i = std::stoi(this->argv[2]);
+
+                Args* args = new Args(this->pixels, this->img->getWidth(), this->img->getHeight(), i, &rgbs[0]);
+                BaseCounter::countParallel(args);
+
+                string name = string(this->argv[2]).append(".txt");
+                FILE *f = fopen(TEXT(name.c_str()), "wb");
+                fwrite(rgbs, sizeof(int), 3, f);
+                fclose(f);
+            }
+        }
+
+        static void* __stdcall countParallel(void *args) {
+            Args* params = (Args*)args;
+
+            int dw = params->width / THREADS_NUMBER;
+            if (params->t_num == THREADS_NUMBER - 1) {
+                dw = params->width - (THREADS_NUMBER - 1)*dw;
+            }
+
+            int endw = params->width - (params->width / THREADS_NUMBER) * params->t_num;
+
+            for (int i = endw - 1; i >= endw - dw; i--) {
+                for (int j = 0; j < params->height; j++) {
+                    params->rgb[params->pixels[params->width*j + i]->getDominantColor()]++;
+                }
+            }
+
+            return nullptr;
+        }
+};

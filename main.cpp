@@ -9,26 +9,22 @@
 
 int main(int argc, char** argv)
 {
-    string path = "path/to/img";
-    
-    if (argc == 2) {
-        path = argv[1];
+    string path = "assets/monkey.jpg";
+
+    if (argc > 1) {
+        path = string(argv[1]);
     }
 
     Image *img = new Image(path);
 
-    ThreadCounter* threadCounter = new ThreadCounter(img);
-    threadCounter->count();
-
-    PThreadCounter* pThreadCounter = new PThreadCounter(img);
-    pThreadCounter->count();
-
-    OMPCounter* ompCounter = new OMPCounter(img);
-    ompCounter->count();
-
-    // CreateProcessCounter* createProcessCounter = new CreateProcessCounter(img, argc, argv);
-    // createProcessCounter->count();
-
+    CreateProcessCounter* createProcessCounter = new CreateProcessCounter(img, argc, argv);
+    if (argc < 3) {
+        createProcessCounter->count();
+    } else {
+        createProcessCounter->count(false);
+    }
+    
     img->clear();
     return 0;
+
 }
