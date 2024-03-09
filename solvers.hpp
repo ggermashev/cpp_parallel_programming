@@ -353,23 +353,13 @@ class CreateProcessCounter: public BaseCounter {
                 fclose(f);
             }
         }
+};
 
-        static void* __stdcall countParallel(void *args) {
-            Args* params = (Args*)args;
 
-            int dw = params->width / THREADS_NUMBER;
-            if (params->t_num == THREADS_NUMBER - 1) {
-                dw = params->width - (THREADS_NUMBER - 1)*dw;
-            }
-
-            int endw = params->width - (params->width / THREADS_NUMBER) * params->t_num;
-
-            for (int i = endw - 1; i >= endw - dw; i--) {
-                for (int j = 0; j < params->height; j++) {
-                    params->rgb[params->pixels[params->width*j + i]->getDominantColor()]++;
-                }
-            }
-
-            return nullptr;
-        }
+class ForkCounter: public BaseCounter {
+    public:
+        ForkCounter(Image* img, int argc, char** argv): BaseCounter(img) {
+            this->argc = argc;
+            this->argv = argv;
+        };
 };

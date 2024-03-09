@@ -9,7 +9,7 @@
 
 int main(int argc, char** argv)
 {
-    string path = "assets/monkey.jpg";
+    string path = "path/to/img";
 
     if (argc > 1) {
         path = string(argv[1]);

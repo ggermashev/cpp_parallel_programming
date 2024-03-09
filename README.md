@@ -8,6 +8,7 @@
 3. 2. pthread_create
 4. 3. dts::thread
 5. 4. OMP
+6. 5j CreateProcess + text files
 
 ## Описание файлов
 
