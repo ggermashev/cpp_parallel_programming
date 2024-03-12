@@ -12,8 +12,7 @@
 #include "image.hpp"
 
 using namespace std;
-// #define THREADS_NUMBER 8
-#define THREADS_NUMBER 1
+#define THREADS_NUMBER 8
 #define BUF_SIZE 256
 
 class Args {
@@ -390,47 +389,68 @@ class CreateProcessMapViewOfFileCounter: public BaseCounter {
                 }
 
                 for (int i = 0; i < THREADS_NUMBER; i++) {
-                    WaitForSingleObject(pi[i].hProcess, INFINITE);
+                    TCHAR name[8];
+                    sprintf(name, "Global\\%d", i);
+                    HANDLE hMapFile;
+
+                    hMapFile = OpenFileMappingA(
+                        FILE_MAP_ALL_ACCESS,
+                        FALSE,
+                        name
+                    );  
+
+                    if (hMapFile == NULL) {
+                        i--;
+                    }
                 }
 
 
                 for (int i = 0; i < THREADS_NUMBER; i++) {
                     int rgbs[3] {0, 0, 0};
                     
-                    TCHAR name[16];
+                    TCHAR name[8];
                     sprintf(name, "Global\\%d", i);
 
                     HANDLE hMapFile;
                     LPCTSTR pBuf;
 
                     hMapFile = OpenFileMappingA(
-                        FILE_MAP_ALL_ACCESS,   // read/write access
-                        FALSE,                 // do not inherit the name
-                        name                 // name of mapping object
+                        FILE_MAP_ALL_ACCESS,
+                        FALSE,
+                        name
                     );  
 
                     if (hMapFile == NULL) {
-                        cout << "Cant open file mapping: " << i << "\n";
-                    }    
+                        cout << "Cant open file mapping: " << GetLastError() << "\n";
+                    }
 
                     pBuf = (LPTSTR) MapViewOfFile(
-                        hMapFile, // handle to map object
-                        FILE_MAP_ALL_ACCESS,  // read/write permission
+                        hMapFile,
+                        FILE_MAP_ALL_ACCESS,
                         0,
                         0,
                         BUF_SIZE
-                    );      
+                    );     
 
                     if (pBuf == NULL) {
-                        cout << "Cant map view of file: " << i << "\n";
+                        cout << "Cant map view of file\n";
+                        return;
+                    }
+
+                    stringstream stream(pBuf);
+                    int k = 0;
+                    while(stream){
+                        stream >> rgbs[k++];
                     }
 
                     for (int i = 0; i < 3; i++) {
                         this->rgb[i] += rgbs[i];
                     }
+
+                    TerminateProcess(pi[i].hProcess, 0);
                 }    
 
-                cout << "CreateProcess:\n";
+                cout << "CreateProcess with MapViewOfFile:\n";
                 this->print();
             } else {
                 int rgbs[3] {0,0,0};
@@ -439,7 +459,7 @@ class CreateProcessMapViewOfFileCounter: public BaseCounter {
                 Args* args = new Args(this->pixels, this->img->getWidth(), this->img->getHeight(), i, &rgbs[0]);
                 BaseCounter::countParallel(args); 
 
-                TCHAR name[16];
+                TCHAR name[8];
                 sprintf(name, "Global\\%d", i);
                 
                 TCHAR msg[BUF_SIZE];
@@ -448,37 +468,35 @@ class CreateProcessMapViewOfFileCounter: public BaseCounter {
                 HANDLE hMapFile;
                 LPCTSTR pBuf;
 
-                SetLastError(0);
                 hMapFile = CreateFileMappingA(
-                    INVALID_HANDLE_VALUE,    // use paging file
-                    NULL,                    // default security
-                    PAGE_READWRITE,          // read/write access
-                    0,                       // maximum object size (high-order DWORD)
-                    BUF_SIZE,              // maximum object size (low-order DWORD)   
-                    name             
+                    INVALID_HANDLE_VALUE,
+                    NULL,               
+                    PAGE_READWRITE,     
+                    0,                 
+                    BUF_SIZE,          
+                    name
                 );  
-                int err = GetLastError();
 
                 if (hMapFile == NULL) {
-                    cout << "Cant create file mapping: " << i << " with error: " << err << "\n";
-                }  
+                    cout << "Cant create file mapping\n";
+                }
 
                 pBuf = (LPTSTR) MapViewOfFile(
-                    hMapFile,   // handle to map object
-                    FILE_MAP_ALL_ACCESS, // read/write permission
+                    hMapFile,   
+                    FILE_MAP_ALL_ACCESS,
                     0,
                     0,
                     BUF_SIZE
-                );    
+                );   
 
                 if (pBuf == NULL) {
-                    cout << "Cant map view of file in thread: " << i << "\n";
-                } 
+                    cout << "Cant map view of file\n";
+                }
 
                 CopyMemory((PVOID)pBuf, msg, (_tcslen(msg) * sizeof(TCHAR)));
 
-                UnmapViewOfFile(pBuf);
-                CloseHandle(hMapFile);
+                std::chrono::milliseconds timespan(30000);
+                std::this_thread::sleep_for(timespan);
             }
         }
 };
