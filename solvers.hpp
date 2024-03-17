@@ -553,5 +553,55 @@ class Mpi2Counter: public BaseCounter {
 
             MPI_Finalize();
         }
-    
 };
+
+
+class MpiAllCounter: public BaseCounter {
+    public:
+        MpiAllCounter(Image* img, int argc, char** argv): BaseCounter(img) {
+            this->argc = argc;
+            this->argv = argv;
+        };
+
+    private:
+        int argc;
+        char** argv; 
+
+        void countWrap() {
+            int myrank, tag = 0;
+            MPI_Status status;
+            MPI_Init(&this->argc, &this->argv);
+            MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+            if (myrank == 0) {
+                int rgbs[(THREADS_NUMBER+1)*3] {};
+
+                for (int i = 0; i < (THREADS_NUMBER+1)*3; i++) {
+                    rgbs[i] = 0; 
+                }
+
+                int smth[3] {0,0,0};
+                
+                MPI_Gather(smth, 3, MPI_INT, rgbs, 3, MPI_INT, 0, MPI_COMM_WORLD);
+
+                for (int i = 0; i < (THREADS_NUMBER+1)*3; i++) {
+                    this->rgb[i%3] += rgbs[i];
+                }
+
+                cout << "MPIAll:\n";
+                this->print();
+            } else {
+                int rgbs[3] {0,0,0};
+                int i = myrank - 1;
+
+                Args* args = new Args(this->pixels, this->img->getWidth(), this->img->getHeight(), i, &rgbs[0]);
+                BaseCounter::countParallel(args); 
+
+                MPI_Gather(rgbs, 3, MPI_INT, nullptr, 3, MPI_INT, 0, MPI_COMM_WORLD);
+            }
+
+            MPI_Finalize();
+        }
+};
+
+

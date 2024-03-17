@@ -17,8 +17,8 @@ int main(int argc, char** argv)
 
     Image *img = new Image(path);
 
-    Mpi2Counter* mpi2 = new Mpi2Counter(img, argc, argv);
-    mpi2->count(false);
+    MpiAllCounter* mpiAll = new MpiAllCounter(img, argc, argv);
+    mpiAll->count(false);
     
 
     img->clear();

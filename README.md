@@ -11,6 +11,7 @@
 6. 5j CreateProcess + text files
 7. 5d CreateProcess + MapViewOfFile
 8. 7a MPI2 + Async
+9. 8. MPI_Collective
 
 ## Описание файлов
 
