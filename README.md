@@ -9,6 +9,8 @@
 4. 3. dts::thread
 5. 4. OMP
 6. 5j CreateProcess + text files
+7. 5d CreateProcess + MapViewOfFile
+8. 7a MPI2 + Async
 
 ## Описание файлов
 

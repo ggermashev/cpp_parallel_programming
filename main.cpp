@@ -9,7 +9,7 @@
 
 int main(int argc, char** argv)
 {
-    string path = "assets/monkey.jpg";
+    string path = "path/to/img";
 
     if (argc > 1) {
         path = string(argv[1]);
@@ -17,14 +17,10 @@ int main(int argc, char** argv)
 
     Image *img = new Image(path);
 
-    CreateProcessMapViewOfFileCounter* createProcessMapViewOfFileCounter = new CreateProcessMapViewOfFileCounter(img, argc, argv);
-    if (argc < 3) {
-        createProcessMapViewOfFileCounter->count();
-    } else {
-        createProcessMapViewOfFileCounter->count(false);
-    }
+    Mpi2Counter* mpi2 = new Mpi2Counter(img, argc, argv);
+    mpi2->count(false);
     
-    
+
     img->clear();
     return 0;
 

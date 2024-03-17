@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <conio.h>
 #include <tchar.h>
+#include "mpi.h"
 #include "image.hpp"
 
 using namespace std;
@@ -499,4 +500,58 @@ class CreateProcessMapViewOfFileCounter: public BaseCounter {
                 std::this_thread::sleep_for(timespan);
             }
         }
+};
+
+
+class Mpi2Counter: public BaseCounter {
+    public:
+        Mpi2Counter(Image* img, int argc, char** argv): BaseCounter(img) {
+            this->argc = argc;
+            this->argv = argv;
+        };
+
+    private:
+        int argc;
+        char** argv; 
+
+        void countWrap() {
+            int myrank, tag = 0;
+            MPI_Status status;
+            MPI_Init(&this->argc, &this->argv);
+            MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+            if (myrank == 0) {
+                int rgbs[THREADS_NUMBER][3] {};
+                MPI_Request req[THREADS_NUMBER];
+                
+                for (int i = 0; i < THREADS_NUMBER; i++) {
+                    MPI_Irecv(&rgbs[i][0], 3, MPI_INT, i+1, tag, MPI_COMM_WORLD, &req[i]);
+                }
+
+                for (int i = 0; i < THREADS_NUMBER; i++) {
+                    MPI_Wait(&req[i], &status);
+                }
+
+                for (int i = 0; i < THREADS_NUMBER; i++) {
+                    for (int k = 0; k < 3; k++) {
+                        this->rgb[k] += rgbs[i][k];
+                    }
+                }
+
+                cout << "MPI2 Async:\n";
+                this->print();
+            } else {
+                int rgbs[3] {0,0,0};
+                int i = myrank - 1;
+
+                Args* args = new Args(this->pixels, this->img->getWidth(), this->img->getHeight(), i, &rgbs[0]);
+                BaseCounter::countParallel(args); 
+
+                MPI_Request req;
+                MPI_Isend(&rgbs[0], 3, MPI_INT, 0, tag, MPI_COMM_WORLD, &req);
+            }
+
+            MPI_Finalize();
+        }
+    
 };
